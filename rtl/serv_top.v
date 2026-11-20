@@ -145,6 +145,7 @@ module serv_top
    wire          alu_cmp_eq;
    wire          alu_cmp_sig;
    wire          alu_cmp;
+   wire          branch_cmp;
    wire [2:0]    alu_rd_sel;
 
    wire [B:0]    rs1;
@@ -240,7 +241,7 @@ module serv_top
       .i_rst          (i_rst),
       //State
       .i_new_irq      (new_irq),
-      .i_alu_cmp      (alu_cmp),
+      .i_alu_cmp      (branch_cmp),
       .o_init         (init),
       .o_cnt_en       (cnt_en),
       .o_cnt0to3      (cnt0to3),
@@ -459,6 +460,38 @@ module serv_top
       .o_bad_pc   (bad_pc),
       //External
       .o_ibus_adr (wb_ibus_adr));
+
+   generate
+      if (W == 4) begin : gen_branch_cmp
+         reg equal_r;
+         reg less_r;
+
+         wire chunk_equal = (rs1 == rs2);
+
+         // Chunks arrive least significant first. A higher unequal
+         // chunk determines ordering; equal chunks preserve prior ordering.
+         // cnt0 seeds the comparison independently of previous state.
+         wire equal_next = chunk_equal & (cnt0 | equal_r);
+         wire less_next = (rs1 < rs2) |
+                          (chunk_equal & !cnt0 & less_r);
+
+         // Only the final chunk's sign bits determine signed ordering.
+         // Keep the accumulated ordering unsigned between chunks.
+         wire signed_less = (alu_cmp_sig & (rs1[B] ^ rs2[B])) ?
+                            rs1[B] : less_next;
+
+         assign branch_cmp = alu_cmp_eq ? equal_next : signed_less;
+
+         always @(posedge clk) begin
+             if (cnt_en) begin
+                 equal_r <= equal_next;
+                 less_r <= less_next;
+             end
+         end
+      end else begin : gen_branch_cmp_other_width
+         assign branch_cmp = alu_cmp;
+      end
+   endgenerate
 
    serv_alu #(.W (W)) alu
      (
