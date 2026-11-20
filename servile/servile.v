@@ -9,6 +9,7 @@
 module servile
   #(
     parameter	    width = 1,
+    parameter	    pre_register = 1,
     parameter	    reset_pc = 32'h00000000,
     parameter	    reset_strategy = "MINI",
     parameter	    rf_width = 2*width,
@@ -201,7 +202,7 @@ module servile
      #(
        .WITH_CSR       (with_csr?1:0),
        .W              (width),
-       .PRE_REGISTER   (1'b1),
+       .PRE_REGISTER   (pre_register),
        .RESET_STRATEGY (reset_strategy),
        .RESET_PC       (reset_pc),
        .DEBUG          (debug),
